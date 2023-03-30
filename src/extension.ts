@@ -107,6 +107,9 @@ async function filterText(inplace: boolean, entry: string) {
     if (entry) {
         const cwd = getCurrentWorkingDirectory();
 
+        let originalEntry = entry;
+        entry = replacePredefinedVariables(entry);
+
         const commands = shell_quote.parse(entry).reduce((r, v) => {
             if (v.op === '|') {
                 return r.concat([[]]);
@@ -124,7 +127,7 @@ async function filterText(inplace: boolean, entry: string) {
           return;
         }
 
-        lastEntry = entry; // save even if not a valid command to make it easier to fix a typo
+        lastEntry = originalEntry; // save even if not a valid command to make it easier to fix a typo
 
         const range = getSelectionRange();
         let text = getTextFromRange(range);
@@ -285,4 +288,27 @@ function getCurrentWorkingDirectory(): string {
     }
 
     return os.homedir();
+}
+
+/**
+ * This function will replace any occurences of 'predefined variables'
+ * (see https://code.visualstudio.com/docs/editor/variables-reference#_predefined-variables),
+ * with the values for that variable.
+ *
+ * For example, given that the current open filename is `/home/user/project/somefile.txt`,
+ * and the `entry` string is `echo -n "Hello ${file}..."`, then the text filtered will result in
+ * the string `Hello /home/user/project/somefile.txt...`.
+ *
+ * @returns The entry string where each predefined variable is replaced with its corresponding value.
+ */
+function replacePredefinedVariables(entry: string): string {
+    let map = new Map();
+    map.set("${file}", vscode.window.activeTextEditor.document.fileName);
+    map.set("${lineNumber}", vscode.window.activeTextEditor.selection.active.line);
+
+    map.forEach((val, key) => {
+        entry = entry.replace(key, val);
+    });
+
+    return entry;
 }
